@@ -13,7 +13,7 @@ namespace Game1
             const int goalY = 3;
             double gamma = .6;
             double learnRate = 0.1;
-            int episodes = 1000000000;
+            int episodes = 100000;
 
             //DOWN, UP, LEFT, RIGHT
             char[,] environment = new char[height, width]
@@ -36,26 +36,9 @@ namespace Game1
 
             QTable = Train(environment, reward, QTable, goalY, goalX, gamma, learnRate, episodes);
 
-
-            PrintQ(QTable);
-
-
-            List<List<(int, int, int)>> bruh = new List<List<(int, int, int)>>();
-            List<int> list = new List<int>();
-            for(int i = 0; i < height; i++)
-            {
-                for(int j = 0; j < width; j++)
-                {
-                    bruh.Add(GetPossNextStates(i, j, environment));
-                    list.Add((GetStateForQ(i, j)));
-                }
-            }
-
             Walk(0, 0, environment, QTable);
 
-
-
-            //PrintMap(environment, 0, 3);
+            PrintQ(QTable);
 
         }
 
@@ -72,7 +55,7 @@ namespace Game1
             //RIGHT = 3
             if (curStateY >= 0 && curStateX + 1 <= xRightBounds) { possNextStates.Add((curStateY, curStateX + 1, 3)); }
             //UP = 0
-            if (curStateY - 1 >= 0 && curStateX >= 0) { possNextStates.Add((curStateY - 1, curStateX, 0)); }
+            if (curStateY - 1 >= yUpperBounds && curStateX >= 0) { possNextStates.Add((curStateY - 1, curStateX, 0)); }
             //DOWN = 1
             if (curStateY + 1 <= yLowerBounds && curStateX >= 0) { possNextStates.Add((curStateY + 1, curStateX, 1)); }
          
@@ -157,7 +140,7 @@ namespace Game1
             bool goalReached = false;
             while(goalReached != true)
             {
-                Thread.Sleep(200);
+                Thread.Sleep(500);
                 var curStateQ = GetStateForQ(curY, curX);
                 var possNextStates = GetPossNextStates(curY, curX, environment);
                 var maxQ = double.MinValue;
