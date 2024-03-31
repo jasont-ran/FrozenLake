@@ -4,7 +4,7 @@ namespace Game1
 {
     internal class Program
     {
-        static Random rnd = new Random(1);
+        static Random rnd = new Random();
         static void Main(string[] args)
         {
             const int height = 4;
@@ -13,6 +13,7 @@ namespace Game1
             const int goalY = 3;
             double gamma = .6;
             double learnRate = 0.1;
+            double epsilon = 1;
             int episodes = 100000;
 
             //DOWN, UP, LEFT, RIGHT
@@ -29,12 +30,12 @@ namespace Game1
                 { 0, 0, 0, 0 },
                 { 0, -1, 0, -1 },
                 { 0, 0, 0, -1 },
-                { -1, 0, 0, 10 }
+                { -1, 0, 0, 1 }
             };
 
             double[,] QTable = new double[height * height, width];
 
-            QTable = Train(environment, reward, QTable, goalY, goalX, gamma, learnRate, episodes);
+            QTable = Train(environment, reward, QTable, goalY, goalX, gamma, learnRate, epsilon, episodes);
 
             Walk(0, 0, environment, QTable);
 
@@ -42,7 +43,7 @@ namespace Game1
 
         }
 
-        static List<(int, int, int)> GetPossNextStates(int curStateY, int curStateX, char[,] environment)
+        static List<(int Y, int X, int ActionState)> GetPossNextStates(int curStateY, int curStateX, char[,] environment)
         {
             List<(int, int, int)> possNextStates = new List<(int, int, int)>();
             int xLeftBounds = 0;
@@ -62,28 +63,45 @@ namespace Game1
             return possNextStates;
         }
 
-        static (int, int, int) GetRandNextState(List<(int, int, int)> possibleStates)
+        static (int, int, int) GetRandNextState(List<(int Y, int X, int ActionState)> possibleStates)
         {
             int count = possibleStates.Count;
             int nextState = rnd.Next(0, count);
             return possibleStates[nextState];
         }
 
-        static double[,] Train(char[,] environment, double[,] reward, double[,] QTable, int goalY, int goalX, double gamma, double learnRate, int episodes)
+        static double[,] Train(char[,] environment, double[,] reward, double[,] QTable, int goalY, int goalX, double gamma, double learnRate, double epsilon, int episodes)
         {
+            double maxEpsilon = 1;
+            var minEpsilon = .01;
+            var epsilonDecay = 0.001;
             for(int episode = 0; episode < episodes; episode++)
             {
                 int curStateY = 0;
                 int curStateX = 0;
-                while (true)
+                bool done = false;
+                while (!done)
                 {
-                    var possNextStates = GetPossNextStates(curStateY, curStateX, environment);
-                    var nextState = GetRandNextState(possNextStates);
+                    var action = (0, 0, 0);
+                    var random = rnd.NextDouble();
 
-                    var possNextNextStates = GetPossNextStates(nextState.Item1, nextState.Item2, environment);
+                    if (random < epsilon)
+                    {
+                        var possNextStates = GetPossNextStates(curStateY, curStateX, environment);
+                        var nextState = GetRandNextState(possNextStates);
+                        action = nextState;
+                    }
+                    else
+                    {
+                        var curQState = GetStateForQ(curStateY, curStateX);
+                        var nextState = GetMaxNextState(curStateY, curStateX, environment, QTable);
+                        action = nextState;
+                    }
+
+                    var possNextNextStates = GetPossNextStates(action.Item1, action.Item2, environment);
 
                     var qState = GetStateForQ(curStateY, curStateX);
-                    var qNextState = GetStateForQ(nextState.Item1, nextState.Item2);
+                    var qNextState = GetStateForQ(action.Item1, action.Item2);
 
                     var maxQ = double.MinValue;
                     //get q max of next state poss values
@@ -94,21 +112,44 @@ namespace Game1
                         if (q > maxQ) { maxQ = q; }
                     }
                     
-                    QTable[qState, nextState.Item3] 
-                        = QTable[qState, nextState.Item3] * (1 - learnRate) + learnRate * (reward[nextState.Item1, nextState.Item2] + gamma * maxQ);
+                    QTable[qState, action.Item3] 
+                        = QTable[qState, action.Item3] * (1 - learnRate) + learnRate * (reward[action.Item1, action.Item2] + gamma * maxQ);
 
-                    curStateY = nextState.Item1;
-                    curStateX = nextState.Item2;
-                    if(environment[curStateY, curStateX] == 'h') { break; }
-                    if(environment[curStateY, curStateX] == 'g') { break; }
+                    epsilon = minEpsilon + (maxEpsilon - minEpsilon) * Math.Exp(-epsilonDecay * episode);
+                    
+
+                    curStateY = action.Item1;
+                    curStateX = action.Item2;
+                    if(environment[curStateY, curStateX] == 'h') { done = true; }
+                    if(environment[curStateY, curStateX] == 'g') { done = true; }
                 }
             }
+            Console.WriteLine(epsilon);
             return QTable;
         }
 
         static int GetStateForQ(int curY, int curX)
         {
             return ((curY + 1) * 4) - (4 - (curX + 1)) - 1;
+        }
+
+        static (int Y, int X, int ActionState) GetMaxNextState(int curY, int curX, char[,] environment, double[,] Q)
+        {
+            var possNextStates = GetPossNextStates(curY, curX, environment);
+            var max = double.MinValue;
+            var maxQState = (0, 0, 0);
+            var qState = GetStateForQ(curY, curY);
+            foreach (var state in possNextStates)
+            {
+                var qValue = Q[qState, state.ActionState];
+                if(qValue > max) 
+                {
+                    max = qValue;
+                    maxQState = state;
+                }
+            }
+
+            return maxQState;
         }
 
         static void PrintMap(char[,] environment, int curY, int curX)
@@ -133,14 +174,14 @@ namespace Game1
 
            
         }
-
         
         static void Walk(int curY, int curX, char[,] environment, double[,] QTable)
         {
             bool goalReached = false;
-            while(goalReached != true)
+            bool holeReached = false;
+            while(goalReached != true && holeReached != true)
             {
-                Thread.Sleep(500);
+                Thread.Sleep(1000);
                 var curStateQ = GetStateForQ(curY, curX);
                 var possNextStates = GetPossNextStates(curY, curX, environment);
                 var maxQ = double.MinValue;
@@ -162,14 +203,16 @@ namespace Game1
                 if (actionToTake == 3) { curX++; }
 
                 PrintMap(environment, curY, curX);
-
-                if (curY == 3 && curX == 3)
+                if (environment[curY, curX] == 'h')
+                {
+                    holeReached = true;
+                }
+                if (environment[curY, curX] == 'g')
                 {
                     goalReached = true;
                 }
             }
             PrintQ(QTable);
-
         }
         static void PrintQ(double[,] QTable)
         {
