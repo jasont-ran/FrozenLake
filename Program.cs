@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Runtime.ExceptionServices;
+using Colorful;
+using System.Drawing;
+using Console = Colorful.Console;
 namespace Game1
 {
     internal class Program
@@ -14,7 +17,7 @@ namespace Game1
             double gamma = .6;
             double learnRate = 0.1;
             double epsilon = 1;
-            int episodes = 100000;
+            int episodes = 1000;
 
             //DOWN, UP, LEFT, RIGHT
             char[,] environment = new char[height, width]
@@ -39,7 +42,6 @@ namespace Game1
 
             Walk(0, 0, environment, QTable);
 
-            PrintQ(QTable);
 
         }
 
@@ -124,7 +126,6 @@ namespace Game1
                     if(environment[curStateY, curStateX] == 'g') { done = true; }
                 }
             }
-            Console.WriteLine(epsilon);
             return QTable;
         }
 
@@ -162,13 +163,24 @@ namespace Game1
                 {
                     if(i == curY && j == curX)
                     {
-                        Console.Write("s" + " ");
+                        Console.Write("|   ", Color.Cyan);
+                        Console.Write("s", Color.LightYellow);
+                        Console.Write("   ", Color.Cyan);
                     }
                     else
                     {
-                        Console.Write(environment[i, j] + " ");
+                        Console.Write("|   ", Color.Cyan);
+                        if (environment[i, j].Equals('h')) Console.Write(environment[i, j], Color.Red);
+                        else if (environment[i, j].Equals('g')) Console.Write(environment[i, j], Color.Green);
+                        else Console.Write(environment[i, j], Color.White);
+                        Console.Write("   ", Color.Cyan);
                     }
                 }
+                Console.WriteLine();
+                for(int k = 0; k < environment.GetLength(1); k++)
+                {
+                    Console.Write("-------", Color.Cyan);
+                };
                 Console.WriteLine();
             }
 
@@ -181,7 +193,7 @@ namespace Game1
             bool holeReached = false;
             while(goalReached != true && holeReached != true)
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(3000);
                 var curStateQ = GetStateForQ(curY, curX);
                 var possNextStates = GetPossNextStates(curY, curX, environment);
                 var maxQ = double.MinValue;
